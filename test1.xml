@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.adeo.api.financial.reporting.mapper.UnpaidInvoiceMapper">
+	<resultMap id="selectUnpaidInvoiceByLegalSupplierResultMap" type="com.adeo.api.financial.reporting.dto.UnpaidInvoiceDTO">
+		<result property="invoiceDate" column="INVOICE_DATE" />
+		<result property="invoiceNum" column="INVOICE_NUM" />
+		<result property="invoiceDescription" column="DESCRIPTION_INVOICE" />
+		<result property="invoiceState" column="STATE" />
+		<result property="storeNum" column="STORE_NUM" />
+		<result property="storeName" column="STORE_NAME" />
+		<result property="paymentMethod" column="PAYMENT_METHOD" />
+		<result property="invoiceAmount" column="AMOUNT" />
+		<result property="invoiceCurrency" column="INVOICE_CURRENCY_CODE" />
+		<result property="dueDate" column="DUE_DATE" />
+		<result property="blocked" column="hold_flag" />
+		<result property="tvaBlocking" column="auto_block" />
+		<result property="holdCode" column="state" />
+		<result property="totalRows" column="total_rows"/>
+	</resultMap>
+
+	<select id="getUnpaidInvoiceByLegalSupplierSegment" resultMap="selectUnpaidInvoiceByLegalSupplierResultMap">
+		WITH t AS (
+		<!-- requete -->
+		<trim prefix="SELECT" prefixOverrides="," suffixOverrides=",">
+			uf.invoice_date,
+			uf.invoice_num,
+			uf.invoice_currency_code,
+			uf.description AS STORE_NAME,
+			uf.description_invoice,
+		<choose>
+			<when test="properties.holdCodeITEnabled">
+				<include refid="com.adeo.api.financial.reporting.mapper.InvoiceStateMapper.stateIt">
+					<property name="tableAndColumnName" value="uf.hold_code"/>
+				</include>
+			</when>
+			<when test="properties.holdCodeRUEnabled">
+				<include refid="com.adeo.api.financial.reporting.mapper.InvoiceStateMapper.stateRu">
+					<property name="tableAndColumnName" value="uf.hold_code"/>
+				</include>
+			</when>
+			<otherwise>
+				CASE
+					WHEN SUM(uf.sum_get_hold_counts) > 0 THEN 'NO_BAP'
+					ELSE 'BAP'
+				END
+			</otherwise>
+		</choose> AS state,
+			uf.attribute1 AS store_num,
+			uf.due_date,
+			uf.meaning AS payment_method,
+			<choose>
+				<when test="properties.invoiceBlockingEnabled">
+					CASE
+					when uf.hold_flag = 'Y' THEN 'true'
+					else 'false'
+					END AS hold_flag,
+					CASE
+					when uf.auto_block = 'Y' THEN 'true'
+					else 'false'
+					END AS auto_block,
+				</when>
+				<otherwise>
+					'false' as hold_flag,
+					'false' as auto_block,
+				</otherwise>
+			</choose>
+			SUM(uf.sum_invoice_amount) AS amount,
+		</trim>
+		FROM
+			${datasource.schema}.bo_sp001_unpaid_fact uf
+		WHERE
+			uf.bo_user = #{search.legalSupplierSegment}
+		<trim prefix="GROUP BY" prefixOverrides="," suffixOverrides=",">
+			uf.bo_user,
+			uf.attribute1,
+			uf.description,
+			uf.due_date,
+			uf.invoice_currency_code,
+			uf.invoice_date,
+			uf.invoice_num,
+			uf.meaning,
+			uf.description_invoice,
+			<if test="properties.invoiceBlockingEnabled">
+				CASE
+					WHEN uf.hold_flag = 'Y' THEN 'true'
+					ELSE 'false'
+				END,
+				CASE
+					WHEN uf.auto_block = 'Y' THEN 'true'
+					ELSE 'false'
+				END,
+			</if>
+		</trim>
+		), r AS (
+			select INVOICE_DATE,INVOICE_NUM, DESCRIPTION_INVOICE, STATE, STORE_NUM, STORE_NAME, PAYMENT_METHOD, AMOUNT,
+			INVOICE_CURRENCY_CODE,DUE_DATE, hold_flag, auto_block, COUNT(1) OVER() AS total_rows, row_number() over
+			(ORDER BY invoice_date ASC) as line_number
+			from t
+			<if test="!search.invoiceState.name().equals('ALL')">
+			where state = '${search.invoiceState}'
+			</if>
+			)
+		select *
+		from r
+		<if test="!search.export">
+			WHERE line_number BETWEEN ${search.page} AND ${search.sizePage}
+		</if>
+		ORDER BY line_number
+		<!-- fin requete -->
+	</select>
+</mapper>

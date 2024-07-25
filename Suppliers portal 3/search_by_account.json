@@ -1,0 +1,15 @@
+[
+    {
+        "invoiceNumber": "2056",
+        "invoiceInitialIssueDate": "26-03-2024",
+        "invoiceDescription": "87-43983617",
+        "storeNum": "00087",
+        "storeName": "Сургут",
+        "invoicePaymentDueDate": "22-06-2024",
+        "grossAmount": 49501.74,
+        "amountRemaining": "0",
+        "factualReqDate": null,
+        "factualReqNum": null,
+        "accountStatus": "Ожидает оплату"
+    }
+]

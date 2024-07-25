@@ -1,0 +1,28 @@
+[
+    {
+        "invoiceNumber": "4302",
+        "invoiceInitialIssueDate": "03-06-2024",
+        "invoiceDescription": "122-44740762",
+        "storeNum": "00122",
+        "storeName": "Истра",
+        "invoicePaymentDueDate": "23-08-2024",
+        "grossAmount": 4626,
+        "amountRemaining": "4626",
+        "factualReqDate": null,
+        "factualReqNum": null,
+        "accountStatus": "Заблокирован для оплаты"
+    },
+    {
+        "invoiceNumber": "5198",
+        "invoiceInitialIssueDate": "26-06-2024",
+        "invoiceDescription": "30-55982711",
+        "storeNum": "00030",
+        "storeName": "Новосибирск 2",
+        "invoicePaymentDueDate": "15-09-2024",
+        "grossAmount": 68713.44,
+        "amountRemaining": "68713.44",
+        "factualReqDate": null,
+        "factualReqNum": null,
+        "accountStatus": "Заблокирован для оплаты"
+    }
+]

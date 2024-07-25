@@ -1,0 +1,16 @@
+[
+  {
+    "invoiceNumber": "5986",
+    "invoiceInitialIssueDate": "2024-02-26 00:00:00",
+    "invoiceDescription": "27-43730894",
+    "storeNum": "00027",
+    "storeName": "Казань",
+    "invoicePaymentDueDate": "2024-05-30 00:00:00",
+    "grossAmount": 7083.43,
+    "amountRemaining": "0",
+    "factualReqDate": "2024-03-05 00:00:00",
+    "factualReqNum": "1211726",
+    "isBlocked": "False",
+    "accountStatus": "Ожидает оплату"
+  }
+]

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.adeo.api.financial.reporting.mapper.InvoiceMapper">
+	<resultMap id="selectInvoiceByLegalSupplierResultMap" type="com.adeo.api.financial.reporting.dto.InvoiceDTO">
+		<result property="storeNum" column="STORE_NUM" />
+		<result property="storeName" column="STORE_NAME" />
+		<result property="dueDate" column="INVOICE_ECHEANCE" />
+			<result property="invoiceCurrency" column="INVOICE_CURRENCY_CODE" typeHandler="org.apache.ibatis.type.EnumTypeHandler" />
+			<result property="invoiceDate" column="INVOICE_DATE" />
+			<result property="invoiceNum" column="INVOICE_NUM" />
+			<result property="paymentMethod" column="PAYMENT_METHOD" />
+			<result property="invoiceAmount" column="INVOICE_AMOUNT" />
+			<result property="invoiceDescription" column="INVOICE_DESCRIPTION" />
+			<result property="blocked" column="hold_flag" />
+			<result property="tvaBlocking" column="auto_block" />
+			<result property="invoiceState" column="STATE" typeHandler="org.apache.ibatis.type.EnumTypeHandler" />
+			<result property="invoicePayment" column="INVOICE_PAYMENT" />
+			<result property="invoicePaymentDate" column="INVOICE_PAYMENT_DATE" />
+			<result property="invoicePaymentAmount" column="INVOICE_PAYMENT_AMOUNT" />
+			<result property="invoicePaymentRemaining" column="INVOICE_AMOUNT_RESTANT" />
+			<result property="totalRows" column="total_rows"/>
+		</resultMap>
+
+	<select id="getInvoiceByLegalSupplierSegment" resultMap="selectInvoiceByLegalSupplierResultMap">
+		WITH t AS (
+		<!-- requete -->
+		<trim prefix="SELECT" prefixOverrides="," suffixOverrides=",">
+			invoice.invoice_date,
+			invoice.invoice_num,
+			invoice.description AS invoice_description,
+			invoice.invoice_amount,
+			invoice.invoice_currency_code,
+			invoice.entity AS STORE_NUM,
+
+			entity.description AS STORE_NAME,
+			apsa.due_date AS invoice_echeance,
+			apsa.amount_remaining AS invoice_amount_restant,
+			payment.check_number AS invoice_payment,
+			payment.check_date AS invoice_payment_date,
+			payment.amount AS invoice_payment_amount,
+			payment.meaning AS payment_method,
+		<if test="properties.invoiceBlockingEnabled">
+			CASE
+				when apsa.hold_flag = 'Y' THEN 'true'
+				else 'false'
+			END AS hold_flag,
+			CASE
+				when apsad.auto_block = 'Y' THEN 'true'
+				else 'false'
+			END AS auto_block,
+		</if>
+		<choose>
+			<when test="properties.holdCodeITEnabled">
+				<include refid="com.adeo.api.financial.reporting.mapper.InvoiceStateMapper.stateIt">
+					<property name="tableAndColumnName" value="aha.hold_lookup_code"/>
+				</include>
+			</when>
+			<when test="properties.holdCodeRUEnabled">
+				<include refid="com.adeo.api.financial.reporting.mapper.InvoiceStateMapper.stateRu">
+					<property name="tableAndColumnName" value="aha.hold_lookup_code"/>
+				</include>
+			</when>
+			<otherwise>
+				CASE WHEN COUNT(aha.hold_lookup_code) > 0
+					then 'NO_BAP'
+					else 'BAP'
+				END
+			</otherwise>
+		</choose> AS state,
+			COUNT(1) OVER() AS total_rows,
+			row_number() over (ORDER BY invoice_date ASC) line_number
+		</trim>
+		FROM
+			(
+			select pv.segment1, aia.invoice_id, aia.invoice_num, aia.invoice_date, aia.description, aia.invoice_amount, aia.invoice_currency_code, aia.set_of_books_id,
+			aiad.${properties.entityColumn} as entity
+			from ${datasource.schema}.po_vendors pv
+			join ${datasource.schema}.ap_invoices_all aia on pv.vendor_id = aia.vendor_id
+			join ${datasource.schema}.ap_invoices_all_dfv aiad on aia.rowid = aiad.row_id
+			<where>
+				<foreach open="aia.org_id in (" separator="," close=")" collection="properties.listBuOrgId" item="orgIdItem">#{orgIdItem}</foreach>
+				AND pv.segment1 = #{search.legalSupplierSegment}
+			</where>
+			) invoice
+			join (
+				select bffv.description, bffv.flex_value, gl.set_of_books_id
+				from ${datasource.schema}.fnd_flex_values_vl bffv
+				join ${datasource.schema}.fnd_id_flex_segments fifs on bffv.flex_value_set_id = fifs.flex_value_set_id
+				join ${datasource.schema}.gl_sets_of_books gl on fifs.id_flex_num = gl.chart_of_accounts_id
+				where fifs.id_flex_code = 'GL#'
+				AND fifs.segment_num = 2
+			) entity on invoice.entity = entity.flex_value and invoice.set_of_books_id = entity.set_of_books_id
+			join ${datasource.schema}.ap_payment_schedules_all apsa on invoice.invoice_id = apsa.invoice_id
+			<if test="properties.invoiceBlockingEnabled">
+				left join ${datasource.schema}.ap_payment_schedules_all_dfv apsad on apsa.rowid = apsad.row_id
+			</if>
+		left join (
+			select
+				aipa.invoice_id,
+				MAX(aca.check_number) AS check_number,
+				MAX(aca.check_date) AS check_date,
+				SUM(aca.amount) AS amount,
+				MAX(lookup_pcheckmethod.meaning) AS meaning
+
+			from ${datasource.schema}.ap_invoice_payments_all aipa
+			join ${datasource.schema}.ap_checks_all aca on aipa.check_id = aca.check_id
+			join (
+
+				select lookup_code, meaning
+				from ${datasource.schema}.fnd_lookup_values
+				WHERE language = #{properties.codeLangueOfi}
+				AND lookup_type = 'PAYMENT METHOD'
+			) LOOKUP_PCHECKMETHOD on aca.payment_method_lookup_code = LOOKUP_PCHECKMETHOD.lookup_code
+			group by aipa.invoice_id
+		) payment on invoice.invoice_id = payment.invoice_id
+
+		left join ${datasource.schema}.ap_holds_all aha on (aha.invoice_id = invoice.invoice_id and aha.release_lookup_code IS NULL)
+		<choose>
+			<when test="search.numberSearched != null and search.numberSearched != ''">
+				where invoice_num like '%${search.numberSearched}%'
+				<choose>
+					<when test="search.beginDate != null and search.endDate != null">
+						and invoice_date <![CDATA[ >= ]]> to_date('${search.beginDate}', 'YYYY-MM-DD') and invoice_date <![CDATA[ < ]]> to_date('${search.endDate}', 'YYYY-MM-DD') + 1
+					</when>
+				</choose>
+			</when>
+			<when test="search.beginDate != null and search.endDate != null and (search.numberSearched == null or search.numberSearched == '')">
+				where invoice_date <![CDATA[ >= ]]> to_date('${search.beginDate}', 'YYYY-MM-DD') and invoice_date <![CDATA[ < ]]> to_date('${search.endDate}', 'YYYY-MM-DD') + 1
+			</when>
+		</choose>
+	<trim prefix="GROUP BY" prefixOverrides="," suffixOverrides=",">
+		invoice.invoice_date,
+		invoice.invoice_num,
+		invoice.description,
+		invoice.invoice_amount,
+		invoice.invoice_currency_code,
+		invoice.entity,
+
+		entity.description,
+		apsa.due_date,
+		apsa.amount_remaining,
+		payment.check_number,
+		payment.check_date,
+		payment.amount,
+		payment.meaning,
+		<if test="properties.invoiceBlockingEnabled">
+			CASE
+				when apsa.hold_flag = 'Y' THEN 'true'
+				else 'false'
+			END,
+			CASE
+				when apsad.auto_block = 'Y' THEN 'true'
+				else 'false'
+			END,
+		</if>
+	</trim>
+) select *
+	from t
+	<if test="!search.export">
+	 	WHERE line_number BETWEEN ${search.page} AND ${search.sizePage}
+	</if>
+   ORDER BY line_number
+<!-- fin requete -->
+</select>
+</mapper>
