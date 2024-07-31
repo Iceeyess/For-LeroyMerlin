@@ -1,5 +1,5 @@
 path_to = 'C:\\Users\\60227416\\OneDrive - leroymerlin.ru\\Рабочий стол\\1\\'
-file_name = 'Райфф 22.07.txt'
+file_name = 'Альфа банк 23.07.txt'
 
 with open(path_to + file_name, 'r', encoding='utf-8') as file:
     f = file.readlines()

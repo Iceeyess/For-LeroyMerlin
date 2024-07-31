@@ -1,7 +1,7 @@
 from pandas import pandas as pd
 
 excel_model = pd.read_excel('verification_list.xlsx', 'Лист1', index_col=0)
-search_phrase = 'Продажа/покупка валюты. Банковский номер сделки FX_42543. Курс сделки: 102.83000000. Пара валют по сделке: EUR/RUR'
+search_phrase = '(ИНН 5029069967; КПП 502901001) ошибочно перечисленные денежные средства по документу - Взыскание с Габисова Ольга Александровна по исполнительному документу35373/24/63040-ИП от 18.04.2024 в пользу ООО Премьер'
 for index, elem in enumerate(excel_model['Фраза для поиска'], 1):
     modified_search_words = [_ for _ in elem.strip('%').split('%') if _]
     counter = 0
